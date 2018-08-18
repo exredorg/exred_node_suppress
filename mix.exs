@@ -1,16 +1,16 @@
 defmodule Exred.Node.Suppress.Mixfile do
   use Mix.Project
 
+  @description "Suppresses incoming messages for a defined time period"
+
   def project do
     [
       app: :exred_node_suppress,
       version: "0.1.0",
-      build_path: "../../_build",
-      config_path: "../../config/config.exs",
-      deps_path: "../../deps",
-      lockfile: "../../mix.lock",
       elixir: "~> 1.5",
       start_permanent: Mix.env == :prod,
+      description: @description,
+      package: package(),
       deps: deps()
     ]
   end
@@ -27,7 +27,7 @@ defmodule Exred.Node.Suppress.Mixfile do
       {:ex_doc, "~> 0.18.0", only: :dev, runtime: false}
     ]
   end
-  
+
   defp package do
     %{
       licenses: ["MIT"],
