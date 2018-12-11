@@ -1,14 +1,14 @@
 defmodule Exred.Node.Suppress do
   @moduledoc """
   Suppresses or filters incoming messages for configurable time periods.
-  
+
   ###Inputs
-  
-    `topic :: string`  
+
+    `topic :: string`
     if message suppression starts when triggered then a message with '_START' topic triggers the suppression
     otherwise topic is ignored
 
-    `payload :: term | number`  
+    `payload :: term | number`
     if suppressing a band then payload needs to be number (it'll get compared to the less\\_then and greater\\_then limits)
   """
 
@@ -18,8 +18,8 @@ defmodule Exred.Node.Suppress do
   @config [
     name: %{
       info: "Visible node name",
-      value: @name, 
-      type: "string", 
+      value: @name,
+      type: "string",
       attrs: %{max: 20}
     },
     per_topic: %{
@@ -29,7 +29,8 @@ defmodule Exred.Node.Suppress do
       attrs: %{options: [true, false]}
     },
     start_when: %{
-      info: "Start suppressing when the flow is deployed or when a message with topic: '_START' arrives",
+      info:
+        "Start suppressing when the flow is deployed or when a message with topic: '_START' arrives",
       type: "select",
       value: "triggered",
       attrs: %{options: ["deployed", "triggered"]}
@@ -44,7 +45,7 @@ defmodule Exred.Node.Suppress do
       info: "Time period in milliseconds",
       type: "number",
       value: 100,
-      attrs: %{min: 1, max: 3600000} 
+      attrs: %{min: 1, max: 3_600_000}
     },
     what: %{
       info: "What to suppress",
@@ -64,64 +65,74 @@ defmodule Exred.Node.Suppress do
     }
   ]
   @ui_attributes [
-    fire_button: false, 
+    fire_button: false,
     right_icon: "gavel"
   ]
-  
-  use Exred.Library.NodePrototype
+
+  use Exred.NodePrototype
   require Logger
 
   @impl true
   def node_init(state) do
-    Logger.warn "CONFIG #{inspect state.config}"
-    timer_ref = if state.config.start_when.value == "deployed" do
-      case state.config.how_long.value do
-        "forever" -> :forever
-        "time_period" -> 
-          {:ok, ref} = :timer.send_after state.config.time_period.value, :_TIMEOUT
-          ref
+    Logger.warn("CONFIG #{inspect(state.config)}")
+
+    timer_ref =
+      if state.config.start_when.value == "deployed" do
+        case state.config.how_long.value do
+          "forever" ->
+            :forever
+
+          "time_period" ->
+            {:ok, ref} = :timer.send_after(state.config.time_period.value, :_TIMEOUT)
+            ref
+        end
+      else
+        nil
       end
-    else
-      nil
-    end
-    state|> Map.put(:timer_ref, timer_ref)
+
+    state |> Map.put(:timer_ref, timer_ref)
   end
 
   # start a new timer
   # TODO: cancel the old timer
   @impl true
   def handle_msg(%{payload: "_START"}, %{config: %{start_when: %{value: "triggered"}}} = state) do
-    timer_ref = case state.config.how_long.value do
-        "forever" -> :forever
-        "time_period" -> 
-          {:ok, ref} = :timer.send_after state.config.time_period.value, :_TIMEOUT
+    timer_ref =
+      case state.config.how_long.value do
+        "forever" ->
+          :forever
+
+        "time_period" ->
+          {:ok, ref} = :timer.send_after(state.config.time_period.value, :_TIMEOUT)
           ref
       end
+
     {nil, %{state | timer_ref: timer_ref}}
   end
-  
+
   # clear timer_ref from state
   def handle_msg(:_TIMEOUT, state) do
     {nil, %{state | timer_ref: nil}}
   end
-  
+
   def handle_msg(msg, %{timer_ref: timer_ref} = state) do
     case timer_ref do
-
       # no timer, forward all messages
-      nil -> {msg, state}
+      nil ->
+        {msg, state}
 
       # there's a timer running (or it's set to :forever)
-      # this means that we need to suppress messages 
-      _ -> 
+      # this means that we need to suppress messages
+      _ ->
         case state.config.what.value do
           # suppress all messages
-          "all" -> {nil, state}
-          
+          "all" ->
+            {nil, state}
+
           # suppress if payload is in a certain band
           "band" ->
-            if msg.payload < state.config.band_less_then.value or 
-               msg.payload > state.config.band_greater_then.value do
+            if msg.payload < state.config.band_less_then.value or
+                 msg.payload > state.config.band_greater_then.value do
               {nil, state}
             else
               {msg, state}
@@ -129,5 +140,4 @@ defmodule Exred.Node.Suppress do
         end
     end
   end
-
 end
